@@ -25,7 +25,10 @@ import {
   Settings,
   Home,
   Database,
-  Bell
+  Bell,
+  Square,
+  Play,
+  Pause
 } from 'lucide-react'
 import './App.css'
 
@@ -46,6 +49,7 @@ function App() {
   const [copySuccess, setCopySuccess] = useState(false)
   const [deepSearch, setDeepSearch] = useState(false)
   const [searchStats, setSearchStats] = useState(null)
+  const [searchController, setSearchController] = useState(null)
 
   useEffect(() => {
     discoverStorageLocations()
@@ -82,9 +86,22 @@ function App() {
     )
   }
 
+  const stopSearch = () => {
+    if (searchController) {
+      searchController.abort()
+      setSearchController(null)
+    }
+    setIsLoading(false)
+    setSearchProgress(0)
+    updateStatus('Search stopped')
+    setTimeout(() => setCurrentStatus(''), 2000)
+  }
+
   const handleSearch = async () => {
     if (!selectedLocations.length || !searchTerms.trim()) return
 
+    const controller = new AbortController()
+    setSearchController(controller)
     setIsLoading(true)
     setSearchResults([])
     setSelectedFiles([])
@@ -115,7 +132,8 @@ function App() {
           terms: terms,
           searchContent: true,
           deepSearch: deepSearch
-        })
+        }),
+        signal: controller.signal
       })
 
       clearInterval(progressInterval)
@@ -129,9 +147,14 @@ function App() {
         setTimeout(() => setCurrentStatus(''), 3000)
       }
     } catch (error) {
-      console.error('Error searching files:', error)
+      if (error.name === 'AbortError') {
+        console.log('Search was aborted')
+      } else {
+        console.error('Error searching files:', error)
+      }
     } finally {
       setIsLoading(false)
+      setSearchController(null)
       setTimeout(() => setSearchProgress(0), 2000)
     }
   }
@@ -210,157 +233,145 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-700 text-white overflow-hidden">
-      {/* Top Header - Minimal like the fleet dashboard */}
-      <div className="bg-gray-600 px-6 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-600 text-white overflow-hidden">
+      {/* Top Header - Exactly like fleet dashboard */}
+      <div className="bg-slate-500 px-6 py-3 flex items-center justify-between border-b border-slate-400">
         <div className="flex items-center gap-4">
           <div className="w-8 h-8 bg-yellow-400 rounded flex items-center justify-center">
             <div className="grid grid-cols-3 gap-0.5">
               {[...Array(9)].map((_, i) => (
-                <div key={i} className="w-1 h-1 bg-gray-900 rounded-full"></div>
+                <div key={i} className="w-1 h-1 bg-slate-900 rounded-full"></div>
               ))}
             </div>
           </div>
         </div>
         
+        <div className="flex-1 max-w-md mx-8">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-300" />
+            <Input
+              placeholder="Search locations..."
+              className="pl-10 bg-slate-400 border-slate-300 text-white placeholder-slate-200"
+            />
+          </div>
+        </div>
+        
         <div className="flex items-center gap-4">
-          <Bell className="h-5 w-5 text-gray-300" />
-          <div className="flex items-center gap-2 bg-gray-500 px-3 py-1 rounded">
-            <User className="h-4 w-4 text-gray-300" />
-            <span className="text-sm text-gray-300">K3SS</span>
+          <Bell className="h-5 w-5 text-slate-300" />
+          <div className="flex items-center gap-2 bg-slate-400 px-3 py-1 rounded">
+            <User className="h-4 w-4 text-slate-200" />
+            <span className="text-sm text-slate-200">K3SS</span>
           </div>
         </div>
       </div>
 
       <div className="flex h-screen">
-        {/* Left Sidebar - Like Fleet Overview */}
-        <div className="w-64 bg-gray-600 p-6">
+        {/* Left Sidebar - Exactly like Fleet Overview */}
+        <div className="w-64 bg-slate-600 p-6 border-r border-slate-500">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-white">Search</h1>
-            <h2 className="text-xl text-gray-300">Overview</h2>
+            <h2 className="text-xl text-slate-300">Overview</h2>
           </div>
           
           <nav className="space-y-3 mb-8">
-            <div className="flex items-center gap-3 p-2 rounded bg-gray-500">
+            <div className="flex items-center gap-3 p-3 rounded bg-slate-500">
               <Home className="h-5 w-5 text-yellow-400" />
             </div>
-            <div className="flex items-center gap-3 p-2 rounded hover:bg-gray-500 cursor-pointer">
-              <Database className="h-5 w-5 text-gray-400" />
+            <div className="flex items-center gap-3 p-3 rounded hover:bg-slate-500 cursor-pointer">
+              <Database className="h-5 w-5 text-slate-400" />
             </div>
-            <div className="flex items-center gap-3 p-2 rounded hover:bg-gray-500 cursor-pointer">
-              <FileText className="h-5 w-5 text-gray-400" />
+            <div className="flex items-center gap-3 p-3 rounded hover:bg-slate-500 cursor-pointer">
+              <FileText className="h-5 w-5 text-slate-400" />
             </div>
-            <div className="flex items-center gap-3 p-2 rounded hover:bg-gray-500 cursor-pointer">
-              <BarChart3 className="h-5 w-5 text-gray-400" />
+            <div className="flex items-center gap-3 p-3 rounded hover:bg-slate-500 cursor-pointer">
+              <BarChart3 className="h-5 w-5 text-slate-400" />
             </div>
-            <div className="flex items-center gap-3 p-2 rounded hover:bg-gray-500 cursor-pointer">
-              <Settings className="h-5 w-5 text-gray-400" />
+            <div className="flex items-center gap-3 p-3 rounded hover:bg-slate-500 cursor-pointer">
+              <Settings className="h-5 w-5 text-slate-400" />
             </div>
           </nav>
-
-          {/* Search Configuration Panel */}
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm text-gray-300 mb-2 block">Search Terms</label>
-              <Input
-                placeholder="Enter terms..."
-                value={searchTerms}
-                onChange={(e) => setSearchTerms(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="bg-gray-500 border-gray-400 text-white placeholder-gray-300 text-sm"
-              />
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Switch
-                checked={deepSearch}
-                onCheckedChange={setDeepSearch}
-                className="data-[state=checked]:bg-yellow-400"
-              />
-              <label className="text-xs text-gray-300">Deep Search</label>
-            </div>
-
-            <Button 
-              onClick={handleSearch} 
-              disabled={!selectedLocations.length || !searchTerms.trim() || isLoading}
-              className="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-medium"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  <Search className="h-4 w-4 mr-2" />
-                  Search
-                </>
-              )}
-            </Button>
-          </div>
         </div>
 
-        {/* Main Dashboard Area */}
-        <div className="flex-1 relative bg-gray-700 p-6">
-          {/* Floating Metric Cards - Positioned like in fleet dashboard */}
+        {/* Main Dashboard Area - Exactly like fleet dashboard layout */}
+        <div className="flex-1 relative bg-slate-600 p-6">
+          {/* Floating Metric Cards - Positioned exactly like in fleet dashboard */}
           {searchStats && (
             <>
-              {/* Top Left */}
-              <Card className="absolute top-6 left-6 w-32 bg-gray-600 border-gray-500">
-                <CardContent className="p-3 text-center">
-                  <div className="text-lg font-bold text-yellow-400">{searchStats.total_files_scanned}</div>
-                  <div className="text-xs text-gray-300">Files Scanned</div>
+              {/* Top Left - Files Scanned */}
+              <Card className="absolute top-6 left-6 w-40 bg-slate-500 border-slate-400 shadow-lg">
+                <CardContent className="p-4">
+                  <div className="text-xs text-slate-300 mb-1">Files Scanned</div>
+                  <div className="text-2xl font-bold text-yellow-400">{searchStats.total_files_scanned}</div>
+                  <div className="text-xs text-slate-400">Total processed</div>
                 </CardContent>
               </Card>
 
-              {/* Top Right */}
-              <Card className="absolute top-6 right-6 w-40 bg-gray-600 border-gray-500">
-                <CardContent className="p-3">
-                  <div className="text-xs text-gray-300 mb-1">Search Status</div>
-                  <div className="text-sm font-medium text-white">
-                    {isLoading ? 'Searching...' : searchResults.length > 0 ? 'Complete' : 'Ready'}
+              {/* Top Center - Performance Snapshot */}
+              <Card className="absolute top-6 left-1/2 transform -translate-x-1/2 w-48 bg-slate-500 border-slate-400 shadow-lg">
+                <CardContent className="p-4">
+                  <div className="text-xs text-slate-300 mb-2">Performance Snapshot</div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm text-slate-300">Status</div>
+                      <div className="text-lg font-bold text-green-400">
+                        {isLoading ? 'Searching' : searchResults.length > 0 ? 'Complete' : 'Ready'}
+                      </div>
+                    </div>
+                    {searchStats.deep_search_enabled && (
+                      <div className="w-12 h-12 bg-yellow-400 rounded flex items-center justify-center">
+                        <Zap className="h-6 w-6 text-slate-900" />
+                      </div>
+                    )}
                   </div>
-                  {searchStats.deep_search_enabled && (
-                    <Badge className="mt-1 bg-yellow-400 text-gray-900 text-xs">
-                      <Zap className="h-3 w-3 mr-1" />
-                      Deep
-                    </Badge>
-                  )}
                 </CardContent>
               </Card>
 
-              {/* Bottom Left */}
-              <Card className="absolute bottom-32 left-6 w-36 bg-gray-600 border-gray-500">
-                <CardContent className="p-3 text-center">
-                  <div className="text-lg font-bold text-green-400">{searchStats.matching_files}</div>
-                  <div className="text-xs text-gray-300">Matches Found</div>
+              {/* Top Right - Search Terms */}
+              <Card className="absolute top-6 right-6 w-40 bg-slate-500 border-slate-400 shadow-lg">
+                <CardContent className="p-4">
+                  <div className="text-xs text-slate-300 mb-1">Search Terms</div>
+                  <div className="text-2xl font-bold text-blue-400">{searchStats.search_terms.length}</div>
+                  <div className="text-xs text-slate-400">Active queries</div>
                 </CardContent>
               </Card>
 
-              {/* Bottom Right */}
-              <Card className="absolute bottom-32 right-6 w-32 bg-gray-600 border-gray-500">
-                <CardContent className="p-3 text-center">
-                  <div className="text-lg font-bold text-blue-400">{selectedFiles.length}</div>
-                  <div className="text-xs text-gray-300">Selected</div>
+              {/* Bottom Left - Matches Found */}
+              <Card className="absolute bottom-32 left-6 w-40 bg-slate-500 border-slate-400 shadow-lg">
+                <CardContent className="p-4">
+                  <div className="text-xs text-slate-300 mb-1">Matches Found</div>
+                  <div className="text-2xl font-bold text-green-400">{searchStats.matching_files}</div>
+                  <div className="text-xs text-slate-400">Results</div>
+                </CardContent>
+              </Card>
+
+              {/* Bottom Right - Selected Files */}
+              <Card className="absolute bottom-32 right-6 w-40 bg-slate-500 border-slate-400 shadow-lg">
+                <CardContent className="p-4">
+                  <div className="text-xs text-slate-300 mb-1">Selected</div>
+                  <div className="text-2xl font-bold text-purple-400">{selectedFiles.length}</div>
+                  <div className="text-xs text-slate-400">For export</div>
                 </CardContent>
               </Card>
             </>
           )}
 
-          {/* Central Search Results Area - Replacing the vehicle */}
-          <div className="absolute inset-0 flex items-center justify-center p-20">
-            <div className="w-full max-w-4xl h-full">
+          {/* Central Hero Area - Search Results replacing the vehicle */}
+          <div className="absolute inset-0 flex items-center justify-center p-24">
+            <div className="w-full max-w-5xl h-full flex flex-col">
               {searchResults.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
-                    <FileText className="h-24 w-24 mx-auto text-gray-500 mb-4" />
-                    <h3 className="text-xl font-medium text-gray-300 mb-2">No Search Results</h3>
-                    <p className="text-gray-400">Configure search terms and locations to begin</p>
+                    <FileText className="h-32 w-32 mx-auto text-slate-400 mb-6" />
+                    <h3 className="text-2xl font-medium text-slate-300 mb-3">No Search Results</h3>
+                    <p className="text-slate-400 mb-6">Configure search terms and locations to begin</p>
                   </div>
                 </div>
               ) : (
-                <div className="bg-gray-600 rounded-lg p-6 h-full">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium text-white">Search Results ({searchResults.length})</h3>
-                    <div className="flex gap-2">
-                      <Button variant="outline" onClick={handleSelectAll} size="sm" className="border-gray-400 text-gray-300">
+                <div className="bg-slate-500 rounded-lg p-6 h-full shadow-xl border border-slate-400">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-medium text-white">Search Results ({searchResults.length})</h3>
+                    <div className="flex gap-3">
+                      <Button variant="outline" onClick={handleSelectAll} size="sm" className="border-slate-300 text-slate-200 hover:bg-slate-400">
                         {selectedFiles.length === searchResults.length ? 'Deselect All' : 'Select All'}
                       </Button>
                       <Button 
@@ -378,25 +389,25 @@ function App() {
                   <ScrollArea className="h-96">
                     <div className="space-y-3">
                       {searchResults.map((file, index) => (
-                        <div key={index} className="flex items-start space-x-3 p-3 rounded bg-gray-500 hover:bg-gray-400 transition-colors">
+                        <div key={index} className="flex items-start space-x-3 p-4 rounded bg-slate-400 hover:bg-slate-300 transition-colors">
                           <Checkbox
                             checked={selectedFiles.includes(index)}
                             onCheckedChange={() => handleFileToggle(index)}
-                            className="mt-1 border-gray-300"
+                            className="mt-1 border-slate-200"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
                               <span className="font-medium text-white truncate">{file.name}</span>
-                              <Badge className="bg-gray-700 text-gray-300">{file.type}</Badge>
+                              <Badge className="bg-slate-600 text-slate-200">{file.type}</Badge>
                             </div>
-                            <p className="text-sm text-gray-300 truncate">{file.path}</p>
-                            <div className="flex items-center gap-4 text-xs text-gray-400 mt-1">
+                            <p className="text-sm text-slate-200 truncate">{file.path}</p>
+                            <div className="flex items-center gap-4 text-xs text-slate-300 mt-1">
                               <span>{formatFileSize(file.size)}</span>
                               <span>{new Date(file.modified).toLocaleDateString()}</span>
                             </div>
                             <div className="flex flex-wrap gap-1 mt-2">
                               {file.matches.map((match, matchIndex) => (
-                                <Badge key={matchIndex} className="text-xs bg-yellow-400 text-gray-900">
+                                <Badge key={matchIndex} className="text-xs bg-yellow-400 text-slate-900">
                                   {match}
                                 </Badge>
                               ))}
@@ -408,25 +419,78 @@ function App() {
                   </ScrollArea>
                 </div>
               )}
+
+              {/* Search Controls - Under the hero section */}
+              <div className="mt-6 bg-slate-500 rounded-lg p-4 shadow-lg border border-slate-400">
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Enter search terms (comma separated)..."
+                      value={searchTerms}
+                      onChange={(e) => setSearchTerms(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                      className="bg-slate-400 border-slate-300 text-white placeholder-slate-200"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={deepSearch}
+                      onCheckedChange={setDeepSearch}
+                      className="data-[state=checked]:bg-yellow-400"
+                    />
+                    <label className="text-sm text-slate-200">Deep Search</label>
+                  </div>
+                  <Button 
+                    onClick={handleSearch} 
+                    disabled={!selectedLocations.length || !searchTerms.trim() || isLoading}
+                    className="bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-medium px-6"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Search className="h-4 w-4 mr-2" />
+                        Search
+                      </>
+                    )}
+                  </Button>
+                  {isLoading && (
+                    <Button 
+                      onClick={stopSearch}
+                      className="bg-red-600 hover:bg-red-700 text-white px-6"
+                    >
+                      <Square className="h-4 w-4 mr-2" />
+                      Stop
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Progress Bar - Bottom center like in fleet dashboard */}
           {searchProgress > 0 && searchProgress < 100 && (
-            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 w-64">
-              <div className="bg-gray-600 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-gray-300">Searching...</span>
-                  <span className="text-xs text-gray-300">{Math.round(searchProgress)}%</span>
-                </div>
-                <Progress value={searchProgress} className="h-2" />
-              </div>
+            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 w-80">
+              <Card className="bg-slate-500 border-slate-400 shadow-lg">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-slate-200">Searching files...</span>
+                    <span className="text-sm text-yellow-400 font-bold">{Math.round(searchProgress)}%</span>
+                  </div>
+                  <div className="w-full bg-slate-400 rounded-full h-3">
+                    <div 
+                      className="bg-gradient-to-r from-yellow-400 to-yellow-500 h-3 rounded-full transition-all duration-300"
+                      style={{ width: `${searchProgress}%` }}
+                    ></div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
         </div>
 
         {/* Right Panel - Storage Locations */}
-        <div className="w-80 bg-gray-600 p-6">
+        <div className="w-80 bg-slate-600 p-6 border-l border-slate-500">
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-white">Storage Locations</h3>
@@ -435,20 +499,20 @@ function App() {
                 disabled={isDiscovering}
                 variant="outline"
                 size="sm"
-                className="border-gray-400 text-gray-300"
+                className="border-slate-400 text-slate-300 hover:bg-slate-500"
               >
                 <RefreshCw className={`h-4 w-4 ${isDiscovering ? 'animate-spin' : ''}`} />
               </Button>
             </div>
             
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="space-y-3 max-h-80 overflow-y-auto">
               {storageLocations.map((location, index) => (
-                <div key={index} className="flex items-center gap-3 p-2 rounded hover:bg-gray-500 cursor-pointer">
+                <div key={index} className="flex items-center gap-3 p-3 rounded bg-slate-500 hover:bg-slate-400 cursor-pointer transition-colors">
                   <Checkbox
                     checked={selectedLocations.includes(location.path)}
                     onCheckedChange={() => location.accessible && handleLocationToggle(location.path)}
                     disabled={!location.accessible}
-                    className="border-gray-400"
+                    className="border-slate-300"
                   />
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     {location.type === 'cloud' ? (
@@ -456,11 +520,11 @@ function App() {
                     ) : location.type === 'external' ? (
                       <ExternalLink className="h-4 w-4 text-green-400" />
                     ) : (
-                      <HardDrive className="h-4 w-4 text-gray-400" />
+                      <HardDrive className="h-4 w-4 text-slate-400" />
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-white truncate">{location.name}</div>
-                      <div className="text-xs text-gray-400 truncate">{location.path}</div>
+                      <div className="text-xs text-slate-300 truncate">{location.path}</div>
                     </div>
                   </div>
                 </div>
@@ -492,31 +556,31 @@ function App() {
 
           {/* Status Display */}
           {currentStatus && (
-            <div className="mt-6 p-3 bg-gray-500 rounded">
+            <div className="mt-6 p-3 bg-slate-500 rounded border border-slate-400">
               <div className="flex items-center gap-2">
                 {isLoading || isDiscovering ? (
                   <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
                 ) : copySuccess ? (
                   <Check className="h-4 w-4 text-green-400" />
                 ) : null}
-                <span className="text-sm text-gray-300">{currentStatus}</span>
+                <span className="text-sm text-slate-200">{currentStatus}</span>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Formatted Content Modal/Overlay */}
+      {/* Formatted Content Modal */}
       {showFormatted && formattedContent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-6">
-          <div className="bg-gray-600 rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-hidden">
+          <div className="bg-slate-500 rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-hidden border border-slate-400">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-white">LLM-Formatted Content</h3>
               <Button 
                 onClick={() => setShowFormatted(false)}
                 variant="outline"
                 size="sm"
-                className="border-gray-400 text-gray-300"
+                className="border-slate-300 text-slate-200 hover:bg-slate-400"
               >
                 Close
               </Button>
@@ -524,7 +588,7 @@ function App() {
             <Textarea
               value={formattedContent}
               readOnly
-              className="w-full h-96 font-mono text-sm bg-gray-700 border-gray-500 text-gray-300"
+              className="w-full h-96 font-mono text-sm bg-slate-600 border-slate-400 text-slate-200"
             />
           </div>
         </div>
