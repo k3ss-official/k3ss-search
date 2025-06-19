@@ -79,34 +79,159 @@ install_conda() {
     print_success "Miniconda installed successfully"
 }
 
-# Function to setup conda environment
+# Function to initialize conda in current shell
+init_conda() {
+    print_status "Initializing conda in current shell..."
+    
+    # Try multiple conda locations
+    CONDA_PATHS=(
+        "$HOME/miniconda3/etc/profile.d/conda.sh"
+        "$HOME/anaconda3/etc/profile.d/conda.sh"
+        "/opt/conda/etc/profile.d/conda.sh"
+        "/usr/local/miniconda3/etc/profile.d/conda.sh"
+    )
+    
+    for conda_path in "${CONDA_PATHS[@]}"; do
+        if [ -f "$conda_path" ]; then
+            source "$conda_path"
+            print_success "Conda initialized from $conda_path"
+            return 0
+        fi
+    done
+    
+    # Try to add conda to PATH if conda command exists
+    if command_exists conda; then
+        print_success "Conda found in PATH"
+        return 0
+    fi
+    
+    print_error "Could not initialize conda. Please ensure conda is installed and in your PATH."
+    exit 1
+}
+
+# Function to wait for conda environment to be created
+wait_for_env_creation() {
+    local env_name=$1
+    local max_wait=60  # Maximum wait time in seconds
+    local wait_time=0
+    
+    print_status "Waiting for environment '$env_name' to be created..."
+    
+    while [ $wait_time -lt $max_wait ]; do
+        if conda env list | grep -q "^$env_name "; then
+            print_success "Environment '$env_name' created successfully"
+            return 0
+        fi
+        sleep 2
+        wait_time=$((wait_time + 2))
+        echo -n "."
+    done
+    
+    echo
+    print_error "Timeout waiting for environment '$env_name' to be created"
+    exit 1
+}
+
+# Function to wait for conda environment to be activated
+wait_for_env_activation() {
+    local env_name=$1
+    local max_wait=30  # Maximum wait time in seconds
+    local wait_time=0
+    
+    print_status "Waiting for environment '$env_name' to be activated..."
+    
+    while [ $wait_time -lt $max_wait ]; do
+        if [[ "$CONDA_DEFAULT_ENV" == "$env_name" ]]; then
+            print_success "Environment '$env_name' activated successfully"
+            return 0
+        fi
+        sleep 1
+        wait_time=$((wait_time + 1))
+        echo -n "."
+    done
+    
+    echo
+    print_error "Timeout waiting for environment '$env_name' to be activated"
+    exit 1
+}
+
+# Function to list existing conda environments
+list_conda_envs() {
+    print_status "Available conda environments:"
+    conda env list | grep -v "^#" | awk '{print "  - " $1}' | grep -v "^  - $"
+}
+
+# Function to setup conda environment with user choice
 setup_conda_env() {
     print_status "Setting up conda environment..."
     
-    # Check if conda is available
-    if ! command_exists conda; then
-        # Try to source conda
-        if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-            source "$HOME/miniconda3/etc/profile.d/conda.sh"
-        elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
-            source "$HOME/anaconda3/etc/profile.d/conda.sh"
-        else
-            print_error "Conda not found in PATH and conda.sh not found"
-            return 1
-        fi
+    # Initialize conda first
+    init_conda
+    
+    # List existing environments
+    echo
+    list_conda_envs
+    echo
+    
+    # Ask user for choice
+    echo -e "${YELLOW}Do you want to:${NC}"
+    echo "1) Use an existing conda environment"
+    echo "2) Create a new conda environment"
+    echo
+    read -p "Enter your choice (1 or 2): " choice
+    
+    case $choice in
+        1)
+            echo
+            read -p "Enter the name of the existing environment to use: " env_name
+            
+            # Check if environment exists
+            if ! conda env list | grep -q "^$env_name "; then
+                print_error "Environment '$env_name' does not exist!"
+                exit 1
+            fi
+            
+            print_status "Activating existing environment '$env_name'..."
+            conda activate "$env_name"
+            wait_for_env_activation "$env_name"
+            ;;
+        2)
+            echo
+            read -p "Enter the name for the new environment: " env_name
+            
+            # Check if environment already exists
+            if conda env list | grep -q "^$env_name "; then
+                print_warning "Environment '$env_name' already exists. Removing and recreating..."
+                conda env remove -n "$env_name" -y
+                sleep 2
+            fi
+            
+            print_status "Creating new environment '$env_name' with Python 3.12..."
+            conda create -n "$env_name" python=3.12 -y
+            wait_for_env_creation "$env_name"
+            
+            print_status "Activating new environment '$env_name'..."
+            conda activate "$env_name"
+            wait_for_env_activation "$env_name"
+            ;;
+        *)
+            print_error "Invalid choice. Please run the script again and choose 1 or 2."
+            exit 1
+            ;;
+    esac
+    
+    # Verify we're in the correct environment
+    print_status "Verifying conda environment..."
+    echo "Current environment: $CONDA_DEFAULT_ENV"
+    echo "Python version: $(python --version)"
+    echo "Python path: $(which python)"
+    
+    if [[ "$CONDA_DEFAULT_ENV" != "$env_name" ]]; then
+        print_error "Failed to activate environment '$env_name'. Current environment: $CONDA_DEFAULT_ENV"
+        exit 1
     fi
     
-    # Create conda environment
-    ENV_NAME="file-search-tool"
-    if conda env list | grep -q "^$ENV_NAME "; then
-        print_warning "Environment $ENV_NAME already exists. Removing and recreating..."
-        conda env remove -n $ENV_NAME -y
-    fi
-    
-    conda create -n $ENV_NAME python=3.11 -y
-    conda activate $ENV_NAME
-    
-    print_success "Conda environment '$ENV_NAME' created and activated"
+    print_success "Conda environment '$env_name' is ready!"
 }
 
 # Function to install Node.js
@@ -153,11 +278,19 @@ setup_backend() {
     
     cd backend
     
+    # Verify we're still in the conda environment
+    if [[ -z "$CONDA_DEFAULT_ENV" ]]; then
+        print_error "Conda environment not active! This should not happen."
+        exit 1
+    fi
+    
+    print_status "Installing Python dependencies in environment: $CONDA_DEFAULT_ENV"
+    print_status "Using pip: $(which pip)"
+    
     # Install Python dependencies
-    print_status "Installing Python dependencies..."
     pip install -r requirements.txt
     
-    print_success "Backend setup completed"
+    print_success "Backend setup completed in environment: $CONDA_DEFAULT_ENV"
     cd ..
 }
 
@@ -179,11 +312,25 @@ setup_frontend() {
 create_startup_scripts() {
     print_status "Creating startup scripts..."
     
+    # Get the current environment name
+    local env_name="$CONDA_DEFAULT_ENV"
+    
     # Backend startup script
-    cat > start_backend.sh << 'EOF'
+    cat > start_backend.sh << EOF
 #!/bin/bash
+
+# Initialize conda
+if [ -f "\$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+    source "\$HOME/miniconda3/etc/profile.d/conda.sh"
+elif [ -f "\$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+    source "\$HOME/anaconda3/etc/profile.d/conda.sh"
+fi
+
+# Activate the conda environment
+conda activate $env_name
+
+# Start backend
 cd backend
-source activate file-search-tool 2>/dev/null || conda activate file-search-tool
 python src/main.py
 EOF
     
@@ -195,7 +342,7 @@ pnpm run dev --host
 EOF
     
     # Combined startup script
-    cat > start_app.sh << 'EOF'
+    cat > start_app.sh << EOF
 #!/bin/bash
 
 # Colors for output
@@ -203,13 +350,13 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}Starting File Search & Collection Tool...${NC}"
+echo -e "\${BLUE}Starting File Search & Collection Tool...\${NC}"
 
 # Function to cleanup on exit
 cleanup() {
-    echo -e "\n${BLUE}Shutting down servers...${NC}"
-    kill $BACKEND_PID 2>/dev/null || true
-    kill $FRONTEND_PID 2>/dev/null || true
+    echo -e "\n\${BLUE}Shutting down servers...\${NC}"
+    kill \$BACKEND_PID 2>/dev/null || true
+    kill \$FRONTEND_PID 2>/dev/null || true
     exit 0
 }
 
@@ -217,34 +364,34 @@ cleanup() {
 trap cleanup SIGINT SIGTERM EXIT
 
 # Start backend
-echo -e "${BLUE}Starting backend server...${NC}"
+echo -e "\${BLUE}Starting backend server...\${NC}"
 ./start_backend.sh &
-BACKEND_PID=$!
+BACKEND_PID=\$!
 
 # Wait a moment for backend to start
 sleep 3
 
 # Start frontend
-echo -e "${BLUE}Starting frontend server...${NC}"
+echo -e "\${BLUE}Starting frontend server...\${NC}"
 ./start_frontend.sh &
-FRONTEND_PID=$!
+FRONTEND_PID=\$!
 
 # Wait a moment for frontend to start
 sleep 5
 
-echo -e "${GREEN}✅ Application started successfully!${NC}"
-echo -e "${GREEN}📱 Frontend: http://localhost:3000${NC}"
-echo -e "${GREEN}🔧 Backend API: http://localhost:5000${NC}"
-echo -e "${BLUE}Press Ctrl+C to stop the application${NC}"
+echo -e "\${GREEN}✅ Application started successfully!\${NC}"
+echo -e "\${GREEN}📱 Frontend: http://localhost:3000\${NC}"
+echo -e "\${GREEN}🔧 Backend API: http://localhost:5000\${NC}"
+echo -e "\${BLUE}Press Ctrl+C to stop the application\${NC}"
 
 # Wait for processes
-wait $BACKEND_PID $FRONTEND_PID
+wait \$BACKEND_PID \$FRONTEND_PID
 EOF
     
     # Make scripts executable
     chmod +x start_backend.sh start_frontend.sh start_app.sh
     
-    print_success "Startup scripts created"
+    print_success "Startup scripts created for environment: $env_name"
 }
 
 # Main installation function
@@ -281,7 +428,7 @@ main() {
         print_success "Conda found: $(conda --version)"
     fi
     
-    # Setup conda environment
+    # Setup conda environment with user choice
     setup_conda_env
     
     # Install Node.js
@@ -304,6 +451,8 @@ main() {
     echo "  Installation completed successfully! 🎉"
     echo "=================================================="
     echo -e "${NC}"
+    echo
+    echo -e "${BLUE}Environment used: ${GREEN}$CONDA_DEFAULT_ENV${NC}"
     echo
     echo -e "${BLUE}To start the application:${NC}"
     echo -e "  ${GREEN}./start_app.sh${NC}     - Start both backend and frontend"
