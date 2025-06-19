@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# File Search & Collection Tool - Installation Script
+# K3SS Search - Installation Script
 # This script sets up the complete environment for the file search application
 
 set -e  # Exit on any error
@@ -355,7 +355,7 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "\${BLUE}Starting File Search & Collection Tool...\${NC}"
+echo -e "\${BLUE}Starting K3SS Search...\${NC}"
 
 # Function to cleanup on exit
 cleanup() {
@@ -413,7 +413,7 @@ The installation script created/used the conda environment: **$env_name**
 However, conda environment activation only works within the script's shell session. 
 After the script finishes, you need to manually activate the environment.
 
-## To Use the Application:
+## To Use K3SS Search:
 
 ### Option 1: Use the startup script (Recommended)
 \`\`\`bash
@@ -453,8 +453,8 @@ conda activate $env_name
 - Python path: \$(which python) (when activated)
 - Pip path: \$(which pip) (when activated)
 
-## Access the Application
-- Frontend: http://localhost:3000
+## Access K3SS Search
+- Frontend: http://localhost:5173
 - Backend API: http://localhost:5000/api
 EOF
 }
@@ -463,7 +463,7 @@ EOF
 main() {
     echo -e "${BLUE}"
     echo "=================================================="
-    echo "  File Search & Collection Tool - Installer"
+    echo "  K3SS Search - Installer"
     echo "=================================================="
     echo -e "${NC}"
     
@@ -533,13 +533,13 @@ main() {
     echo -e "  ${GREEN}conda activate $CONDA_ENV_NAME${NC}  - Activate the environment first"
     echo -e "  ${GREEN}./start_app.sh${NC}                    - Then start the application"
     echo
-    echo -e "${BLUE}Access the application at:${NC}"
-    echo -e "  ${GREEN}http://localhost:3000${NC}"
+    echo -e "${BLUE}Access K3SS Search at:${NC}"
+    echo -e "  ${GREEN}http://localhost:5173${NC}"
     echo
     echo -e "${BLUE}For detailed instructions, see:${NC}"
     echo -e "  ${GREEN}POST_INSTALL_INSTRUCTIONS.md${NC}"
     echo
-    print_status "Happy file searching! 🔍"
+    print_status "Happy searching with K3SS Search! 🔍"
 }
 
 # Run main function

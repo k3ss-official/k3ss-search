@@ -1,12 +1,12 @@
-# File Search & Collection Tool
+# K3SS Search
 
 ## Overview
 A comprehensive web application for discovering, searching, and collecting documents from various storage locations for LLM processing.
 
 ## Quick Start
 ```bash
-git clone https://github.com/k3ss-official/file-search-collection-tool.git
-cd file-search-collection-tool
+git clone https://github.com/k3ss-official/k3ss-search.git
+cd k3ss-search
 chmod +x install.sh
 ./install.sh
 ```
@@ -36,7 +36,7 @@ chmod +x install.sh
 
 ## Usage
 1. Run the application with `./start_app.sh`
-2. Open http://localhost:3000
+2. Open http://localhost:5173
 3. Select storage locations to search
 4. Enter search terms (comma-separated)
 5. Select files from results

@@ -1,6 +1,6 @@
-# File Search & Collection Tool
+# K3SS Search
 
-A comprehensive web application that discovers, searches, and collects documents from various storage locations for LLM processing. Built with Flask backend and React frontend.
+A comprehensive web application for discovering, searching, and collecting documents from various storage locations for LLM processing. Built with Flask backend and React frontend.
 
 ## Features
 
@@ -38,7 +38,7 @@ A comprehensive web application that discovers, searches, and collects documents
 ## Architecture
 
 ```
-file-search-collection-tool/
+k3ss-search/
 ├── backend/           # Flask API server
 │   ├── src/
 │   │   ├── services/  # File discovery and parsing services
@@ -60,18 +60,19 @@ file-search-collection-tool/
 ### Option 1: Automated Installation (Recommended)
 
 ```bash
-git clone https://github.com/k3ss-official/file-search-collection-tool.git
-cd file-search-collection-tool
+git clone https://github.com/k3ss-official/k3ss-search.git
+cd k3ss-search
 chmod +x install.sh
 ./install.sh
 ```
 
 The install script will:
 1. Check for conda/miniconda installation
-2. Create a dedicated conda environment
-3. Install all Python dependencies
+2. Let you choose existing conda environment or create new one
+3. Install all Python dependencies in the conda environment
 4. Install Node.js dependencies
-5. Start both backend and frontend servers
+5. Create startup scripts
+6. Provide clear usage instructions
 
 ### Option 2: Manual Installation
 
@@ -79,12 +80,12 @@ The install script will:
 - Python 3.11+
 - Node.js 18+
 - pnpm (or npm)
+- Conda/Miniconda (recommended)
 
 #### Backend Setup
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+conda activate your-env  # or create new environment
 pip install -r requirements.txt
 ```
 
@@ -96,17 +97,18 @@ pnpm install  # or npm install
 
 #### Running the Application
 ```bash
-# Terminal 1 - Backend
-cd backend
-source venv/bin/activate
-python src/main.py
+# Use the automated startup script (recommended)
+./start_app.sh
 
-# Terminal 2 - Frontend
-cd frontend
-pnpm run dev --host  # or npm run dev -- --host
+# Or start components separately:
+# Terminal 1 - Backend
+./start_backend.sh
+
+# Terminal 2 - Frontend  
+./start_frontend.sh
 ```
 
-Access the application at `http://localhost:3000`
+Access the application at `http://localhost:5173` (frontend) with backend API at `http://localhost:5000`
 
 ## Usage
 
@@ -143,10 +145,10 @@ The application works out-of-the-box with sensible defaults. For advanced usage:
 ### Backend Configuration
 - Port: Default 5000 (configurable in `src/main.py`)
 - CORS: Enabled for all origins
-- File size limits: No hard limits (system dependent)
+- Database: SQLite (automatically created)
 
 ### Frontend Configuration
-- Port: Default 3000 (configurable via `--port` flag)
+- Port: Default 5173 (Vite dev server)
 - API URL: `http://localhost:5000/api` (configurable in `App.jsx`)
 
 ## Security & Privacy
@@ -160,24 +162,25 @@ The application works out-of-the-box with sensible defaults. For advanced usage:
 
 ### Common Issues
 
-1. **Port already in use**
+1. **Backend won't start - Database error**
+   - Fixed in latest version - database directory is created automatically
+
+2. **Port already in use**
    ```bash
-   # Kill processes on ports 5000 and 3000
+   # Kill processes on ports 5000 and 5173
    pkill -f "python src/main.py"
    pkill -f "vite"
    ```
 
-2. **Permission denied errors**
+3. **Conda environment not active**
+   ```bash
+   conda activate your-env-name
+   ./start_app.sh
+   ```
+
+4. **Permission denied errors**
    - Ensure your user has read access to the directories you want to search
    - On macOS, you may need to grant Terminal access to folders in System Preferences
-
-3. **Large file processing**
-   - The app handles large files but may be slow with very large PDFs
-   - Consider excluding large binary files from search paths
-
-4. **Cloud storage not detected**
-   - Ensure cloud storage apps are installed and syncing
-   - Check that sync folders exist in expected locations
 
 ### Performance Tips
 
