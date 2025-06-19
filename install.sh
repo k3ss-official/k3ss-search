@@ -535,6 +535,8 @@ main() {
     echo
     echo -e "${BLUE}Access K3SS Search at:${NC}"
     echo -e "  ${GREEN}http://localhost:5173${NC}"
+    echo -e "${BLUE}Backend API running on:${NC}"
+    echo -e "  ${GREEN}http://localhost:5010${NC}"
     echo
     echo -e "${BLUE}For detailed instructions, see:${NC}"
     echo -e "  ${GREEN}POST_INSTALL_INSTRUCTIONS.md${NC}"
