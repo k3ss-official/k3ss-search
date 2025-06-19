@@ -12,6 +12,9 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Global variable to store the environment name
+CONDA_ENV_NAME=""
+
 # Function to print colored output
 print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -194,6 +197,7 @@ setup_conda_env() {
             print_status "Activating existing environment '$env_name'..."
             conda activate "$env_name"
             wait_for_env_activation "$env_name"
+            CONDA_ENV_NAME="$env_name"
             ;;
         2)
             echo
@@ -213,6 +217,7 @@ setup_conda_env() {
             print_status "Activating new environment '$env_name'..."
             conda activate "$env_name"
             wait_for_env_activation "$env_name"
+            CONDA_ENV_NAME="$env_name"
             ;;
         *)
             print_error "Invalid choice. Please run the script again and choose 1 or 2."
@@ -313,7 +318,7 @@ create_startup_scripts() {
     print_status "Creating startup scripts..."
     
     # Get the current environment name
-    local env_name="$CONDA_DEFAULT_ENV"
+    local env_name="$CONDA_ENV_NAME"
     
     # Backend startup script
     cat > start_backend.sh << EOF
@@ -394,6 +399,66 @@ EOF
     print_success "Startup scripts created for environment: $env_name"
 }
 
+# Function to create post-install instructions
+create_post_install_instructions() {
+    local env_name="$CONDA_ENV_NAME"
+    
+    cat > POST_INSTALL_INSTRUCTIONS.md << EOF
+# Post-Installation Instructions
+
+## Important: Conda Environment Activation
+
+The installation script created/used the conda environment: **$env_name**
+
+However, conda environment activation only works within the script's shell session. 
+After the script finishes, you need to manually activate the environment.
+
+## To Use the Application:
+
+### Option 1: Use the startup script (Recommended)
+\`\`\`bash
+./start_app.sh
+\`\`\`
+This script automatically activates the conda environment and starts both servers.
+
+### Option 2: Manual activation and startup
+\`\`\`bash
+# Activate the conda environment
+conda activate $env_name
+
+# Start the application
+./start_app.sh
+\`\`\`
+
+### Option 3: Start components separately
+\`\`\`bash
+# Terminal 1 - Backend (automatically activates conda env)
+./start_backend.sh
+
+# Terminal 2 - Frontend
+./start_frontend.sh
+\`\`\`
+
+## Troubleshooting
+
+If you see "command not found: pip" or similar errors, it means you're not in the conda environment.
+
+**Solution:**
+\`\`\`bash
+conda activate $env_name
+\`\`\`
+
+## Environment Details
+- Environment name: $env_name
+- Python path: \$(which python) (when activated)
+- Pip path: \$(which pip) (when activated)
+
+## Access the Application
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:5000/api
+EOF
+}
+
 # Main installation function
 main() {
     echo -e "${BLUE}"
@@ -446,26 +511,33 @@ main() {
     # Create startup scripts
     create_startup_scripts
     
+    # Create post-install instructions
+    create_post_install_instructions
+    
     echo -e "${GREEN}"
     echo "=================================================="
     echo "  Installation completed successfully! 🎉"
     echo "=================================================="
     echo -e "${NC}"
     echo
-    echo -e "${BLUE}Environment used: ${GREEN}$CONDA_DEFAULT_ENV${NC}"
+    echo -e "${BLUE}Environment used: ${GREEN}$CONDA_ENV_NAME${NC}"
     echo
-    echo -e "${BLUE}To start the application:${NC}"
-    echo -e "  ${GREEN}./start_app.sh${NC}     - Start both backend and frontend"
+    echo -e "${YELLOW}⚠️  IMPORTANT: Environment Activation Required ⚠️${NC}"
+    echo -e "${BLUE}The conda environment is only active during this script.${NC}"
+    echo -e "${BLUE}To use the application, you have two options:${NC}"
     echo
-    echo -e "${BLUE}Or start components separately:${NC}"
-    echo -e "  ${GREEN}./start_backend.sh${NC}  - Start only the backend server"
-    echo -e "  ${GREEN}./start_frontend.sh${NC} - Start only the frontend server"
+    echo -e "${GREEN}Option 1 (Recommended): Use the startup script${NC}"
+    echo -e "  ${GREEN}./start_app.sh${NC}     - Automatically activates environment and starts both servers"
+    echo
+    echo -e "${GREEN}Option 2: Manual activation${NC}"
+    echo -e "  ${GREEN}conda activate $CONDA_ENV_NAME${NC}  - Activate the environment first"
+    echo -e "  ${GREEN}./start_app.sh${NC}                    - Then start the application"
     echo
     echo -e "${BLUE}Access the application at:${NC}"
     echo -e "  ${GREEN}http://localhost:3000${NC}"
     echo
-    echo -e "${BLUE}API documentation:${NC}"
-    echo -e "  ${GREEN}http://localhost:5000/api${NC}"
+    echo -e "${BLUE}For detailed instructions, see:${NC}"
+    echo -e "  ${GREEN}POST_INSTALL_INSTRUCTIONS.md${NC}"
     echo
     print_status "Happy file searching! 🔍"
 }
