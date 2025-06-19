@@ -50,49 +50,102 @@ class FileDiscoveryService:
         return locations
     
     def _detect_cloud_storage(self, home_path: Path) -> List[Dict[str, Any]]:
-        """Detect common cloud storage locations"""
+        """Detect common cloud storage locations with enhanced Google Drive detection"""
         cloud_locations = []
         
-        # Google Drive locations
-        google_drive_paths = [
-            home_path / 'Google Drive',
-            home_path / 'GoogleDrive',
-            home_path / 'My Drive'
-        ]
+        # Enhanced Google Drive detection for macOS
+        if platform.system() == 'Darwin':
+            google_drive_paths = [
+                # Standard Google Drive locations
+                home_path / 'Google Drive',
+                home_path / 'GoogleDrive',
+                home_path / 'My Drive',
+                # Google Drive File Stream locations
+                home_path / 'Google Drive File Stream',
+                home_path / 'GoogleDriveFileStream',
+                # Google Drive for Desktop locations
+                home_path / 'Google Drive for Desktop',
+                # Check in /Volumes for mounted Google Drives
+                Path('/Volumes') / 'GoogleDrive',
+                Path('/Volumes') / 'Google Drive',
+                Path('/Volumes') / 'My Drive'
+            ]
+            
+            # Also check for Google Drive in /Volumes directory
+            volumes_path = Path('/Volumes')
+            if volumes_path.exists():
+                try:
+                    for volume in volumes_path.iterdir():
+                        if volume.is_dir() and 'google' in volume.name.lower():
+                            google_drive_paths.append(volume)
+                except (PermissionError, OSError):
+                    pass
+        else:
+            # Standard locations for other platforms
+            google_drive_paths = [
+                home_path / 'Google Drive',
+                home_path / 'GoogleDrive',
+                home_path / 'My Drive'
+            ]
         
+        # Check each potential Google Drive path
         for gd_path in google_drive_paths:
-            if gd_path.exists():
-                cloud_locations.append({
-                    'name': 'Google Drive',
-                    'path': str(gd_path),
-                    'type': 'cloud',
-                    'accessible': True,
-                    'description': f'Google Drive sync folder ({gd_path})'
-                })
-                break
+            if gd_path.exists() and gd_path.is_dir():
+                try:
+                    # Test if we can actually access the directory
+                    list(gd_path.iterdir())
+                    cloud_locations.append({
+                        'name': f'Google Drive ({gd_path.name})',
+                        'path': str(gd_path),
+                        'type': 'cloud',
+                        'accessible': True,
+                        'description': f'Google Drive sync folder ({gd_path})'
+                    })
+                except (PermissionError, OSError):
+                    # Add as inaccessible but detected
+                    cloud_locations.append({
+                        'name': f'Google Drive ({gd_path.name}) - Access Denied',
+                        'path': str(gd_path),
+                        'type': 'cloud',
+                        'accessible': False,
+                        'description': f'Google Drive detected but access denied ({gd_path})'
+                    })
         
         # iCloud Drive (macOS)
         if platform.system() == 'Darwin':
-            icloud_path = home_path / 'Library' / 'Mobile Documents' / 'com~apple~CloudDocs'
-            if icloud_path.exists():
-                cloud_locations.append({
-                    'name': 'iCloud Drive',
-                    'path': str(icloud_path),
-                    'type': 'cloud',
-                    'accessible': True,
-                    'description': f'iCloud Drive sync folder ({icloud_path})'
-                })
+            icloud_paths = [
+                home_path / 'Library' / 'Mobile Documents' / 'com~apple~CloudDocs',
+                home_path / 'iCloud Drive',
+                home_path / 'iCloudDrive'
+            ]
+            
+            for icloud_path in icloud_paths:
+                if icloud_path.exists():
+                    cloud_locations.append({
+                        'name': 'iCloud Drive',
+                        'path': str(icloud_path),
+                        'type': 'cloud',
+                        'accessible': True,
+                        'description': f'iCloud Drive sync folder ({icloud_path})'
+                    })
+                    break
         
         # Dropbox
-        dropbox_path = home_path / 'Dropbox'
-        if dropbox_path.exists():
-            cloud_locations.append({
-                'name': 'Dropbox',
-                'path': str(dropbox_path),
-                'type': 'cloud',
-                'accessible': True,
-                'description': f'Dropbox sync folder ({dropbox_path})'
-            })
+        dropbox_paths = [
+            home_path / 'Dropbox',
+            home_path / 'Dropbox (Personal)',
+            home_path / 'Dropbox (Business)'
+        ]
+        
+        for dropbox_path in dropbox_paths:
+            if dropbox_path.exists():
+                cloud_locations.append({
+                    'name': f'Dropbox ({dropbox_path.name})',
+                    'path': str(dropbox_path),
+                    'type': 'cloud',
+                    'accessible': True,
+                    'description': f'Dropbox sync folder ({dropbox_path})'
+                })
         
         # OneDrive
         onedrive_paths = [
@@ -104,13 +157,12 @@ class FileDiscoveryService:
         for od_path in onedrive_paths:
             if od_path.exists():
                 cloud_locations.append({
-                    'name': 'OneDrive',
+                    'name': f'OneDrive ({od_path.name})',
                     'path': str(od_path),
                     'type': 'cloud',
                     'accessible': True,
                     'description': f'OneDrive sync folder ({od_path})'
                 })
-                break
                 
         return cloud_locations
     
@@ -121,15 +173,20 @@ class FileDiscoveryService:
         if platform.system() == 'Darwin':  # macOS
             volumes_path = Path('/Volumes')
             if volumes_path.exists():
-                for volume in volumes_path.iterdir():
-                    if volume.is_dir() and volume.name != 'Macintosh HD':
-                        external_drives.append({
-                            'name': f'External Drive ({volume.name})',
-                            'path': str(volume),
-                            'type': 'external',
-                            'accessible': True,
-                            'description': f'External volume ({volume})'
-                        })
+                try:
+                    for volume in volumes_path.iterdir():
+                        if volume.is_dir() and volume.name not in ['Macintosh HD', 'Preboot', 'Recovery', 'VM', 'Data']:
+                            # Skip Google Drive volumes as they're handled in cloud storage
+                            if 'google' not in volume.name.lower():
+                                external_drives.append({
+                                    'name': f'External Drive ({volume.name})',
+                                    'path': str(volume),
+                                    'type': 'external',
+                                    'accessible': True,
+                                    'description': f'External volume ({volume})'
+                                })
+                except (PermissionError, OSError):
+                    pass
         
         elif platform.system() == 'Linux':
             # Check common mount points
@@ -137,24 +194,30 @@ class FileDiscoveryService:
             for mount_point in mount_points:
                 mount_path = Path(mount_point)
                 if mount_path.exists():
-                    for user_dir in mount_path.iterdir():
-                        if user_dir.is_dir():
-                            for drive in user_dir.iterdir():
-                                if drive.is_dir():
-                                    external_drives.append({
-                                        'name': f'External Drive ({drive.name})',
-                                        'path': str(drive),
-                                        'type': 'external',
-                                        'accessible': True,
-                                        'description': f'External drive ({drive})'
-                                    })
+                    try:
+                        for user_dir in mount_path.iterdir():
+                            if user_dir.is_dir():
+                                for drive in user_dir.iterdir():
+                                    if drive.is_dir():
+                                        external_drives.append({
+                                            'name': f'External Drive ({drive.name})',
+                                            'path': str(drive),
+                                            'type': 'external',
+                                            'accessible': True,
+                                            'description': f'External drive ({drive})'
+                                        })
+                    except (PermissionError, OSError):
+                        pass
         
         return external_drives
     
     def search_files(self, search_paths: List[str], search_terms: List[str], 
-                    search_content: bool = True) -> List[Dict[str, Any]]:
-        """Search for files containing specified terms"""
+                    search_content: bool = True, deep_search: bool = False) -> Dict[str, Any]:
+        """Search for files containing specified terms with enhanced reporting"""
         results = []
+        total_files_scanned = 0
+        total_directories_scanned = 0
+        skipped_files = 0
         
         for search_path in search_paths:
             path = Path(search_path)
@@ -162,12 +225,27 @@ class FileDiscoveryService:
                 continue
                 
             for file_path in self._walk_directory(path):
+                total_files_scanned += 1
+                
                 if file_path.suffix.lower() in self.supported_extensions:
-                    file_info = self._analyze_file(file_path, search_terms, search_content)
+                    file_info = self._analyze_file(file_path, search_terms, search_content, deep_search)
                     if file_info and file_info['matches']:
                         results.append(file_info)
+                else:
+                    skipped_files += 1
         
-        return results
+        return {
+            'success': True,
+            'results': results,
+            'stats': {
+                'total_files_scanned': total_files_scanned,
+                'total_directories_scanned': total_directories_scanned,
+                'matching_files': len(results),
+                'skipped_files': skipped_files,
+                'search_terms': search_terms,
+                'deep_search_enabled': deep_search
+            }
+        }
     
     def _walk_directory(self, path: Path):
         """Recursively walk directory and yield file paths"""
@@ -180,7 +258,7 @@ class FileDiscoveryService:
             pass
     
     def _analyze_file(self, file_path: Path, search_terms: List[str], 
-                     search_content: bool) -> Dict[str, Any]:
+                     search_content: bool, deep_search: bool = False) -> Dict[str, Any]:
         """Analyze a file for search terms and extract metadata"""
         try:
             file_info = {
@@ -201,8 +279,8 @@ class FileDiscoveryService:
                     file_info['matches'].append(term)
             
             # Check content matches if requested
-            if search_content:
-                content = self._extract_text_content(file_path)
+            if search_content or deep_search:
+                content = self._extract_text_content(file_path, deep_search)
                 if content:
                     file_info['full_content'] = content
                     file_info['content_preview'] = content[:500] + '...' if len(content) > 500 else content
@@ -237,19 +315,19 @@ class FileDiscoveryService:
         }
         return type_map.get(extension, f'{extension.upper()} File')
     
-    def _extract_text_content(self, file_path: Path) -> str:
-        """Extract text content from various file types"""
+    def _extract_text_content(self, file_path: Path, deep_search: bool = False) -> str:
+        """Extract text content from various file types with optional deep search"""
         try:
             extension = file_path.suffix.lower()
             
             if extension == '.txt' or extension == '.md':
                 return self._read_text_file(file_path)
             elif extension == '.pdf':
-                return self._extract_pdf_text(file_path)
+                return self._extract_pdf_text(file_path, deep_search)
             elif extension == '.docx':
-                return self._extract_docx_text(file_path)
+                return self._extract_docx_text(file_path, deep_search)
             elif extension in ['.xlsx', '.xls']:
-                return self._extract_excel_text(file_path)
+                return self._extract_excel_text(file_path, deep_search)
             elif extension == '.csv':
                 return self._extract_csv_text(file_path)
             elif extension in ['.py', '.js', '.html', '.css', '.json', '.xml', '.yaml', '.yml']:
@@ -273,15 +351,22 @@ class FileDiscoveryService:
         
         return ''
     
-    def _extract_pdf_text(self, file_path: Path) -> str:
-        """Extract text from PDF using pdfplumber (more reliable than PyPDF2)"""
+    def _extract_pdf_text(self, file_path: Path, deep_search: bool = False) -> str:
+        """Extract text from PDF using pdfplumber with optional deep extraction"""
         try:
             with pdfplumber.open(file_path) as pdf:
                 text = ''
-                for page in pdf.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text += page_text + '\n'
+                max_pages = len(pdf.pages) if deep_search else min(10, len(pdf.pages))
+                
+                for i, page in enumerate(pdf.pages[:max_pages]):
+                    try:
+                        page_text = page.extract_text()
+                        if page_text:
+                            text += page_text + '\n'
+                    except Exception:
+                        # Skip problematic pages but continue
+                        continue
+                        
                 return text
         except Exception:
             # Fallback to PyPDF2
@@ -289,34 +374,64 @@ class FileDiscoveryService:
                 with open(file_path, 'rb') as f:
                     reader = PyPDF2.PdfReader(f)
                     text = ''
-                    for page in reader.pages:
-                        text += page.extract_text() + '\n'
+                    max_pages = len(reader.pages) if deep_search else min(10, len(reader.pages))
+                    
+                    for page in reader.pages[:max_pages]:
+                        try:
+                            text += page.extract_text() + '\n'
+                        except Exception:
+                            continue
                     return text
             except Exception:
                 return ''
     
-    def _extract_docx_text(self, file_path: Path) -> str:
-        """Extract text from Word document"""
+    def _extract_docx_text(self, file_path: Path, deep_search: bool = False) -> str:
+        """Extract text from Word document with optional deep extraction"""
         try:
             doc = Document(file_path)
             text = ''
+            
+            # Extract paragraphs
             for paragraph in doc.paragraphs:
                 text += paragraph.text + '\n'
+            
+            # If deep search, also extract from tables, headers, footers
+            if deep_search:
+                # Extract from tables
+                for table in doc.tables:
+                    for row in table.rows:
+                        for cell in row.cells:
+                            text += cell.text + '\t'
+                        text += '\n'
+                
+                # Extract from headers and footers
+                for section in doc.sections:
+                    if section.header:
+                        for paragraph in section.header.paragraphs:
+                            text += paragraph.text + '\n'
+                    if section.footer:
+                        for paragraph in section.footer.paragraphs:
+                            text += paragraph.text + '\n'
+            
             return text
         except Exception:
             return ''
     
-    def _extract_excel_text(self, file_path: Path) -> str:
-        """Extract text from Excel file"""
+    def _extract_excel_text(self, file_path: Path, deep_search: bool = False) -> str:
+        """Extract text from Excel file with optional deep extraction"""
         try:
             workbook = openpyxl.load_workbook(file_path, data_only=True)
             text = ''
             
-            for sheet_name in workbook.sheetnames:
+            sheets_to_process = workbook.sheetnames if deep_search else workbook.sheetnames[:3]
+            
+            for sheet_name in sheets_to_process:
                 sheet = workbook[sheet_name]
                 text += f'Sheet: {sheet_name}\n'
                 
-                for row in sheet.iter_rows(values_only=True):
+                max_rows = sheet.max_row if deep_search else min(100, sheet.max_row)
+                
+                for row in sheet.iter_rows(max_row=max_rows, values_only=True):
                     row_text = '\t'.join([str(cell) if cell is not None else '' for cell in row])
                     if row_text.strip():
                         text += row_text + '\n'

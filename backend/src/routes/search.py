@@ -14,7 +14,8 @@ def discover_locations():
         locations = file_service.discover_storage_locations()
         return jsonify({
             'success': True,
-            'locations': locations
+            'locations': locations,
+            'total_locations': len(locations)
         })
     except Exception as e:
         return jsonify({
@@ -25,7 +26,7 @@ def discover_locations():
 @search_bp.route('/search', methods=['POST'])
 @cross_origin()
 def search_files():
-    """Search for files based on terms and locations"""
+    """Search for files based on terms and locations with enhanced reporting"""
     try:
         data = request.get_json()
         
@@ -38,6 +39,7 @@ def search_files():
         search_paths = data.get('paths', [])
         search_terms = data.get('terms', [])
         search_content = data.get('searchContent', True)
+        deep_search = data.get('deepSearch', False)
         
         if not search_paths:
             return jsonify({
@@ -51,14 +53,10 @@ def search_files():
                 'error': 'No search terms provided'
             }), 400
         
-        # Perform the search
-        results = file_service.search_files(search_paths, search_terms, search_content)
+        # Perform the search with enhanced reporting
+        search_result = file_service.search_files(search_paths, search_terms, search_content, deep_search)
         
-        return jsonify({
-            'success': True,
-            'results': results,
-            'total': len(results)
-        })
+        return jsonify(search_result)
         
     except Exception as e:
         return jsonify({
@@ -93,7 +91,8 @@ def format_for_llm():
         
         return jsonify({
             'success': True,
-            'formatted_content': formatted_content
+            'formatted_content': formatted_content,
+            'file_count': len(selected_files)
         })
         
     except Exception as e:
