@@ -18,8 +18,12 @@ CORS(app)
 app.register_blueprint(user_bp, url_prefix='/api')
 app.register_blueprint(search_bp, url_prefix='/api')
 
-# uncomment if you need to use database
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"
+# Create database directory if it doesn't exist
+db_dir = os.path.join(os.path.dirname(__file__), 'database')
+os.makedirs(db_dir, exist_ok=True)
+
+# Configure database
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(db_dir, 'app.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 with app.app_context():
@@ -44,3 +48,4 @@ def serve(path):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+
